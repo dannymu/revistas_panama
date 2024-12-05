@@ -1,0 +1,1187 @@
+---
+title: 'Trabajo Final de Master'
+author: "Danny Murillo González"
+format: 
+  html:
+    toc: true
+    theme: cerulean
+    toc-title: "Tabla de contenido"
+    fig-height: 7
+    fig-width: 8
+  docx:
+    toc: true
+    toc-title: "Tabla de contenido"
+    fig-height: 7
+    fig-width: 7
+    # lot: true
+    number-sections: true
+    number-depth: 3
+  pdf:
+    toc: true
+    toc-title: "Tabla de contenido"
+    fig-height: 7
+    fig-width: 7
+    # lot: true
+    number-sections: true
+    number-depth: 3
+    geometry:
+      - top=15.4mm
+      - left=20.4mm
+      - right=20.4mm
+      - bottom=15.4mm
+editor: visual
+code-fold: true
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(factoextra)
+library(cluster)
+library(janitor)
+library(FactoMineR)
+library(skimr)
+library(GGally)
+library(clustertend)
+library(NbClust)
+library(flexclust)
+library(FeatureImpCluster)
+library(ggrepel)
+library(fpc)
+library(cluster)
+library(patchwork)
+library(summarytools)
+library(ggpubr)
+library(gridExtra)
+library(readxl)
+
+
+```
+
+# Introducción
+
+Desde 2018, instituciones de educación superior en Panamá adscritas al Consejo de rectores de Panamá (CRP) han emprendido diversas iniciativas para mejorar la gestión editorial y la visibilidad de las revistas científicas. Esto ha sido crucial para evaluar el impacto de las publicaciones y apoyar a los autores en la selección de plataformas adecuadas para la divulgación de su trabajo. En el año 2019 y 2023 la Secretaría Nacional de Ciencia y Tecnología (SENACYT), financio el programa de fortalecimiento de revistas científicas de Panamá, creando talleres y charlas relacionadas a fortalecer las revistas y como producto final, se crearon los l Catálogo de Revistas de Panamá en 2019 y su actualización en 2023, donde se ha logrado una radiografía del panorama editorial nacional. Sin embargo, persisten retos en cuanto a la clasificación de las revistas, no solo por sus métricas de citas o número de publicaciones, sino también por otros factores cualitativos como políticas de acceso abierto, área temática uso de software anti plagio e integración en bases de datos, entre otros.
+
+Este estudio busca llenar este vacío mediante el uso de herramientas estadísticas avanzadas para analizar y agrupar las revistas panameñas con base en diversos indicadores cualitativos y cuantitativos. Estos resultados permitirán a la Secretaría Nacional de Ciencia y Tecnología (SENACYT) tomar decisiones más informadas en la asignación de fondos y el diseño de políticas de fortalecimiento de las revistas científicas. El análisis contribuirá al desarrollo de una estrategia integral para mejorar la calidad, visibilidad y el impacto de las revistas científicas de Panamá, permitiendo además identificar áreas que requieren intervención urgente, además de generar un resultado diferente y con mayor rigor estadístico que las métricas de la revista basadas en Google scholar.
+
+# Objetivos
+
+1.  Evaluar la relevancia y visibilidad de las revistas científicas panameñas a través de un análisis estadístico descriptivo de sus métricas cualitativas y cuantitativas.
+2.  Agrupar las revistas científicas panameñas utilizando técnicas de análisis de agrupación (clúster jerárquico y no jerárquico) según indicadores cualitativos y cuantitativos.
+3.  Identificar dimensiones clave mediante el Análisis de Correspondencia Múltiple (MCA) que expliquen las similitudes y diferencias entre las revistas, facilitando su clasificación y evaluación.
+4.  Evaluar la relación entre los diferentes indicadores cualitativos y cuantitativos para mejorar la visibilidad y el impacto de las publicaciones en las revistas científicas nacionales.
+5.  Proporcionar recomendaciones basadas en los resultados del análisis de agrupación para orientar a la SENACYT en la asignación de fondos y el fortalecimiento de las revistas que muestran mayor potencial de impacto.
+
+# Metodología
+
+1.  El estudio se llevará a cabo mediante un enfoque cuantitativo y cualitativo basado en las siguientes etapas:
+2.  Recolección de datos: Se utilizará la información del Catálogo de Revistas de Panamá, que incluye datos de 57 revistas panameñas digitales.
+3.  Análisis estadístico descriptivo: Se realizará un análisis descriptivo inicial para obtener una visión general de la distribución de las revistas según diferentes variables.
+4.  Análisis de agrupación:
+
+<!-- -->
+
+a.  Clúster jerárquico: Se aplicará un método de clúster jerárquico para agrupar las revistas según las similitudes en sus características, donde este análisis permitirá identificar jerarquías y relaciones entre las revistas basadas en múltiples criterios.
+b.  Clúster no jerárquico (K-means): Además, se utilizará el algoritmo de K-means para agrupar las revistas en un número predefinido de clústeres, basándose en las características más representativas.
+
+<!-- -->
+
+5.  Reducción de dimensionalidad: Se utilizará el Análisis de Correspondencia Múltiple (MCA) para reducir la cantidad de variables categóricas, facilitando una interpretación más clara de los grupos y relaciones entre las revistas. Esto permitirá identificar dimensiones clave que expliquen las diferencias entre las revistas.
+6.  Software: Todo el análisis se realizará utilizando el software estadístico R. Se creará un informe reproducible en quarto que incluirá los códigos y resultados del estudio.
+
+# Carga de datos
+
+```{r echo=FALSE, message=FALSE}
+
+df <- read_excel("data/revistas-panama-2023.xlsx", sheet = "revistas panama")
+# df <- revistas_panama_2023
+df<- janitor::clean_names(df)
+
+
+```
+
+# Estructuración de datos
+
+## Seleccionar y renombrar variables
+
+```{r  echo=FALSE, message=FALSE}
+
+# Resumen de datos
+revistas_panama_mod <- df
+
+# Cálculo de citas por año
+revistas_panama_mod$citas_anio<-round(revistas_panama_mod$citas /  
+                                        (2023 - revistas_panama_mod$ano_de_inicio),2)
+
+# Eliminar columnas no necesarias
+revistas_panama_dep <- revistas_panama_mod[,-c(3,4:6,8:10,12:15,17:20,22,23,28:30,53,57,58)]
+
+# Unificar datos de columna formato
+revistas_panama_dep$formato[which(revistas_panama_dep$formato == "PDF, FLIP")] <- "PDF"
+revistas_panama_dep$formato[which(revistas_panama_dep$formato == "PDF,FLIP")] <- "PDF"
+revistas_panama_dep$formato[which(revistas_panama_dep$formato == "PDF, HTML")] <- "PDF, HTML"
+revistas_panama_dep$formato[which(revistas_panama_dep$formato == "PDF, XML, EPUB, FLIP")] <- "PDF, HTML"
+#-- PDF y HTML
+revistas_panama_dep$formato[which(revistas_panama_dep$formato == "PDF, HTML")] <- "PDF_HTML"
+
+
+# Pivotear datos de formato de publicacion
+revistas_panama_dep <- revistas_panama_dep %>%
+  pivot_wider(names_from = formato,values_from = formato)
+
+# Renombrar variables 
+# google scholar
+revistas_panama_dep <- revistas_panama_dep |> 
+  rename(google_scholar = gs_url)
+# Publicaciones
+revistas_panama_dep <- revistas_panama_dep |> 
+  rename(publicaciones = publicaciones_indexadas)
+# catalogo latindex
+revistas_panama_dep <- revistas_panama_dep |> 
+  rename(catalogo_Latindex = catalogo_2)
+
+# revistas_panama_dep |>  str()
+
+```
+
+## Seleccionar variables a evaluar y transformar
+
+```{r  echo=FALSE, message=FALSE}
+
+# Seleccionar columnas de base de datos en que está integrada la revista
+columnas_vars <- c(8:32,39)
+columns_to_transform  <- colnames(revistas_panama_dep[columnas_vars])
+
+# Reemplazar valores para cada columna de bases de datos de datos categoricos
+# Contienen valores vacios para las revistas que NO están en la base de datos
+# Nombre_de_variable_si/no
+df_r <- revistas_panama_dep
+# df_r |> str()
+
+for (col in columns_to_transform ) {
+  df_r[[col]] <- ifelse(is.na(df_r[[col]]), 
+                        paste0(col, "_no"),   # Si es NA, poner col_no
+                        paste0(col, "_si"))   # Si tiene datos, poner col_si
+}
+
+# Seleccionar columnas con variables cualitativas SI / NO mayuscula
+columnas_vars2 <- c(5:7)
+columns_to_transform2  <- colnames(df_r[columnas_vars2])
+
+# Reemplazar valores para cada columna de bases de datos
+# contienen valores SI / NO
+# Nombre de variable_si/no
+for (col in columns_to_transform2) {
+  df_r[[col]] <- ifelse(df_r[[col]]=="NO", 
+                        paste0(col, "_no"),   # Si es NA, poner col_no
+                        paste0(col, "_si"))   # Si tiene datos, poner col_si
+}
+
+
+# Transformar tipo de datos 
+# char a factor
+# numerico sin valores NA
+
+# transformar a variables a tipo factor
+categorical_vars <- colnames(df_r[columnas_vars])
+df_r[columnas_vars] <- map(df_r[categorical_vars], as.factor)
+
+# Transformar datos de tema a tipo factor 
+df_r$tema <- as.factor(df_r$tema)
+df_r$orcid <- as.factor(df_r$orcid)
+df_r$doi <- as.factor(df_r$doi)
+df_r$estadisticas <- as.factor(df_r$estadisticas)
+df_r$tipo_institucion <- as.factor(df_r$tipo_institucion)
+
+# Seleccionar columnas numericas y cambiar valores NA por 0
+columnas_var_num<- c(33:37)
+columns_to_transform_num <- colnames(df_r[columnas_var_num])
+
+for (col in columns_to_transform_num) {
+  df_r[[col]] <- ifelse(is.na(df_r[[col]]), 
+                        0,   # Si es NA, poner col_no
+                        df_r[[col]])   # Si tiene datos, poner col_si
+}
+
+
+# Definir los rangos de año y transformalos a factor
+df_r$ano_de_inicio <- cut(df_r$ano_de_inicio, 
+                          breaks = c(1960, 1970, 1980, 1990, 2000, 2010, 2020, Inf), 
+                          labels = c("1960-1970", "1971-1980", "1981-1990", "1991-2000", "2001-2010", "2011-2020", "2021+"),
+                          right = FALSE)
+
+# datos e revistas modificados 
+revistas_panama_dep <- df_r 
+# modificar valor de Inf por 0
+revistas_panama_dep$citas_anio[which(revistas_panama_dep$citas_anio == Inf)] <- 0
+
+#Eliminar variable PDF, todas las revistas utilizan pdf
+revistas_panama_dep <- revistas_panama_dep[,-38]
+
+# revistas_panama_dep |> str()
+
+```
+
+## Mostrar datos de nuevos datos depurados
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# head(revistas_panama_dep) 
+
+```
+
+# Resultados
+
+## OBJETIVO 1. Evaluar la relevancia y visibilidad de las revistas científicas panameñas a través de un análisis estadístico descriptivo de sus métricas cualitativas y cuantitativas.
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# Función para transformar dataframe a Plot
+DB_plot <- function(DBcitas,metricas_cu,num){
+  # Tranformar y renombrar variable
+  # num <-4
+  names <- colnames(metricas_cu)
+  col <- names[num]
+  colnames(DBcitas) <- c(col)
+  DBcitas <- DBcitas |> round(2)
+  
+  # Crea la tabla como gráfico
+  table_plot_citas <- tableGrob(DBcitas)
+  return(table_plot_citas)
+}
+
+
+# Función para integrar dos plot con Plot Dataframe
+arrange_plot <- function(citas_b, citas_h,table_plot_citas){
+  plot <- ggarrange(
+    ggarrange(citas_b, citas_h, ncol = 1, nrow = 2),   # Primera columna con dos gráficos
+    table_plot_citas,                                  # Segunda columna con la tabla
+    ncol = 2,                                          # Dos columnas en total
+    widths = c(2, 1)                                   # Ajusta el ancho de las columnas si es necesario
+  )
+  
+  return(plot)
+}
+
+
+
+# Distribución de Métricas Cuantitativas:
+# Descripción de metricas
+metricas_cu <- descr(revistas_panama_dep[,33:37])
+#Metricas individuales
+DBcitas <- metricas_cu[,1] |>  data.frame()
+DBcitas_anio <- metricas_cu[,2] |>  data.frame()
+DBcitas_publi <- metricas_cu[,3] |>  data.frame()
+DBhindex <- metricas_cu[,4] |>  data.frame()
+DBpublica <- metricas_cu[,5] |>  data.frame()
+
+# Tranformar metricas de dataframe a plot
+table_plot_citas <- DB_plot(DBcitas,metricas_cu,1)
+table_plot_cita_anio <- DB_plot(DBcitas_anio,metricas_cu,2)
+table_plot_citas_publi <- DB_plot(DBcitas_publi,metricas_cu,3)
+table_plot_hindex <- DB_plot(DBhindex,metricas_cu,4)
+table_plot_publica <- DB_plot(DBpublica,metricas_cu,5)
+
+
+```
+
+### Distribución de variables cuantitativas
+
+#### Distribución de citas
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+
+b <- revistas_panama_dep |> 
+  ggplot(aes(citas)) +
+  geom_boxplot(color="red", fill="orange", alpha=0.2)
+
+h <- revistas_panama_dep |> 
+  ggplot(aes(citas)) +
+  geom_histogram(color="red", fill="orange", alpha=0.2)
+
+# Unir gráficos y datos de citas
+arrange_plot(b, h,table_plot_citas)
+
+```
+
+Según información de los datos de **citas** de las revistas, los gráficos presentan una **distribución sesgada a la derecha (asimetría 2.61)**, con datos atípicos. El rango de citas es de 0 a 771, con una media de 88.46 y una desviación alta de 181.04. Los gráficos indican que hay pocas revistas con muchas citas.
+
+#### Distribución de publicaciones
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+# Distribución de publicaciones 
+b <- revistas_panama_dep |> 
+  ggplot(aes(publicaciones)) +
+  geom_boxplot(color="darkolivegreen4", fill="lightgreen", alpha=0.2)
+
+h <- revistas_panama_dep |> 
+  ggplot(aes(publicaciones)) +
+  geom_histogram(color="darkolivegreen4", fill="lightgreen", alpha=0.2)
+
+arrange_plot(b, h,table_plot_publica)
+
+
+```
+
+Según información de los datos de **publicaciones** de las revistas, los gráficos presentan una **distribución sesgada a la derecha (asimetría 1.9)**, con datos atípicos. El rango de publicaciones es de 0 a 282, con una media de 56.74 y una desviación de 60.15. Existe un grupo considerable de revistas con menos de 100 publicaciones.
+
+#### Distribucion de hindex
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+# Distribucion de hindex
+b <-revistas_panama_dep |> 
+  ggplot(aes(h_index)) +
+  geom_boxplot(color="green4", fill="lightgreen", alpha=0.2)
+
+h <-revistas_panama_dep |> 
+  ggplot(aes(h_index)) +
+  geom_histogram(color="green4", fill="lightgreen", alpha=0.2)
+
+arrange_plot(b, h,table_plot_hindex)
+```
+
+Según información de los datos de **hindex** de las revistas, los gráficos presentan una **distribución sesgada a la derecha (asimetría 1.21)**, con datos atípicos. El rango de hindex es de 0 a 12, con una media de 3.02 y una desviación de 3.14. Existe pocas revistas con un hindex por encima del promedio, lo que indica que, dichas revistas tiene al menos 3 revistas con 3 o más citas.
+
+#### Distribución de citas y año
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+# Distribución de citas y año
+b <- revistas_panama_dep |> 
+  ggplot(aes(citas_anio)) +
+  geom_boxplot(color="blue", fill="lightblue", alpha=0.2)
+
+h <- revistas_panama_dep |> 
+  ggplot(aes(citas_anio)) +
+  geom_histogram(color="blue", fill="lightblue", alpha=0.2)
+
+arrange_plot(b, h,table_plot_cita_anio)
+
+```
+
+Según información de los datos de **citas por año** de las revistas, los gráficos presentan una **distribución sesgada a la derecha (asimetría 3.05)**, con datos atípicos. El rango de citas por año es de 0-96.38, con una media de 10.1 y una desviación moderada de 17.91. Existen pocas revistas que generan más de 50 citas por año.
+
+#### Distribucion de citas por publicaciones
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# Distribucion de citas por publicaciones
+b <- revistas_panama_dep |> 
+  ggplot(aes(citas_publica)) +
+  geom_boxplot(color="firebrick4", fill="salmon", alpha=0.2)
+
+h <- revistas_panama_dep |> 
+  ggplot(aes(citas_publica)) +
+  geom_histogram(color="firebrick4", fill="salmon", alpha=0.2)
+
+arrange_plot(b, h,table_plot_citas_publi)
+
+
+```
+
+Según información de los datos de **citas por publicación** de las revistas, los gráficos presentan una **distribución sesgada a la derecha (asimetría 1.58)**, con datos atípicos. El rango de citas por publicación es de 0-4.27, con una media baja de 0.83 y una desviación baja de 0.98. Existen muchas revistas que generan más pocas citas por publicación.
+
+### Distribución de Métricas Cualitativas
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# Selección de plataformas
+var_plataformas <- colnames(revistas_panama_dep[c(1,10:32)])
+plataformas <- revistas_panama_dep[,var_plataformas]
+doi <- plataformas$doi
+
+# Transformar valor si/no en 1/0
+plataformas <- plataformas %>%
+  mutate(across(everything(), ~ ifelse(grepl("si", ., ignore.case = TRUE), 1, 0)))
+
+plataformas$doi <- doi
+
+# Pivotear datos de plataformas
+db_plataforma <- plataformas |> 
+  pivot_longer(cols=c(2:24),
+               names_to='plataforma',
+               values_to='value'
+  )
+
+
+# Gráfico de plataformas eliminando  revistas no integradas (con valor 0 )
+db_plataforma |> 
+  filter(value==1) |> 
+  ggplot(aes(fct_rev(fct_infreq(plataforma)), fill=doi)
+  ) +
+  geom_bar(fill="orange") +
+  coord_flip()+
+  labs(x="Plataformas",
+       y="Num. Revistas")+
+theme_minimal()
+
+
+```
+
+Según gráfico de plataformas donde están integradas las revistas panameñas, todas las revistas están integradas a su repositorio institucional y al directorio de revistas Latindex. Cerca del 50% de las revistas está integrado en el indexador Latindex (catalogo 2.0), Crossreff (que genera identifcadores DOI) y al recolector de repositorios BASE. Menos del 20% de las revistas están integradas en plataformas de como DOAJ (Directorio de revistas de acceso abierto) y han creado un perfil en Google Scholar Citations.
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# Selección de otras caracteristicas de la revista
+# colnames(revistas_panama_dep) |> data.frame()
+var_caracteristica <- colnames(revistas_panama_dep[c(5:9,38)])
+caracteristica <- revistas_panama_dep[,var_caracteristica]
+
+# Transformar valor si/no en 1/0
+caracteristica <- caracteristica %>%
+  mutate(across(everything(), ~ ifelse(grepl("si", ., ignore.case = TRUE), 1, 0)))
+
+# Pivotear datos de plataformas
+db_caracteristica<- caracteristica |> 
+  pivot_longer(cols=c(1:6),
+               names_to='caracteristica',
+               values_to='value'
+  )
+
+
+# Gráfico de plataformas eliminando  revistas no integradas (con valor 0 )
+db_caracteristica |> 
+  filter(value==1) |> 
+  ggplot(aes(fct_rev(fct_infreq(caracteristica)))) +
+  geom_bar(fill="lightblue") +
+  # coord_flip()+
+  labs(x="caracteristica",
+       y="Revistas")+
+  geom_text(
+    aes(label = after_stat(count)
+    ),
+    stat = "count",
+    vjust=1.90,
+    hjust= 0.5,
+    size=2.9
+  )+
+  theme_classic()
+
+```
+
+Según muestra las gráfica de caracteristicas de las revistas, todas utilizan políticas de acceso abierto, 38 utilizan herramientas antiplagio y estadisticas de métricas en sus portales de revistas, 32 de las revistas promueven el uso del identificador de autor ORCID, además 28 de estas revistas utilizan el identificador de documento DOI y solo 22 utilizan el formato HTML, adicional al formato PDF paar comunicar los resultados de las publicaciones.
+
+ ### Revistas con mas citas
+ 
+```{r}
+
+revistas_citas<- revistas_panama_dep |> 
+  select(revista,citas) |> 
+  mutate(citas_ = case_when(citas < 86~ "citas bajas",
+                             citas >=86~ "citas altas",))
+ # table(revistas_citas$citas_)
+  # mean(revistas_panama_dep$citas)
+
+revistas_panama_dep |> 
+  filter(citas >=86) |> 
+  ggplot(aes(citas, reorder(revista, citas))) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text(aes(label = citas), vjust = 0.3, hjust=1.3, color="white") + # Etiquetas de las barras
+  labs(
+    #title = "Citas por Revista",
+    x = "Revistas",
+    y = "Citas"
+  ) +
+  theme_minimal()
+
+
+```
+ 
+ 
+ 
+
+
+## OBJETIVO 2. Agrupar las revistas científicas panameñas utilizando técnicas de análisis de agrupación (clúster jerárquico y no jerárquico) según indicadores cualitativos y cuantitativos
+
+### Análisis cluster jerarquico
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# Análisis cluster jerarquico ---
+# calculo de la distancia alternativa por medio de la distancia de Gower
+# uso de función daisy() ya que las variables contiene datos numericos y categoricos
+
+
+revistas_panama_dep_ <- revistas_panama_dep
+# revistas_panama_dep_ |> str()
+name_revistas <- revistas_panama_dep_$revista
+# eliminar nombre de la revista y politicas oa (todos tiene)
+revistas_panama_dep_ <- revistas_panama_dep_[,-c(1,8)]
+row.names(revistas_panama_dep_) <- name_revistas
+
+# colnames(revistas_panama_dep_) |> data.frame()
+
+# no tomar en cuenta datos numericos
+revistas_panama_dep_0<- revistas_panama_dep_[,c(31:35)]
+row.names(revistas_panama_dep_0) <- name_revistas
+
+
+# Calculo de distancia con todos los datos (daisy), y datos cuantitativos (dist)
+set.seed(123)
+dist_gower_d <- daisy(revistas_panama_dep_,metric = "gower") # metric = c("euclidean", "manhattan", "gower")
+dist_gower <- dist(revistas_panama_dep_0, method = "euclidean") # distancia datos numericos
+
+
+# cluster jerarquico
+clust_d <- hclust(dist_gower_d, method = "complete")  #daisy
+clust <- hclust(dist_gower, method = "complete") 
+
+# grupos
+# cutree(clust_d, k=3) |>  table() #daisy
+# cutree(clust, k=3) |>  table()
+
+# grafico de clustering daisy
+set.seed(123)
+fviz_dend(clust_d, k=3, 
+          rect = TRUE,
+          cex=0.6,
+          horiz = TRUE,
+          main = "Dendrograma del Clustering Jerárquico - Daisy")
+
+```
+
+Para el Análisis de clustering jerárquico se realizó el calculo de la distancia alternativa por medio de la *distancia de Gower*, utilizando todos los datos de revistas, tanto numericos y categoricos, solicitando la creación de 3 clusters, como se muestra en la imagen x (cluster 1 =39, cluster 2 = 16, cluster 3 = 3).
+
+```{r}
+
+# grafico de clustering kmeans
+set.seed(123)
+fviz_dend(clust, k=3, 
+          rect = TRUE,
+          cex=0.6,
+          horiz = TRUE,
+          main = "Dendrograma del Clustering Jerárquico - Kmeans")
+
+```
+
+Para la segundo Análisis de clustering jerárquico se realizó el calculo de la distancia, utilizando solo los datos numéricos de las revistas, solicitando igual la creación de 3 clusters, como se muestra en la imagen x (cluster 1 =52, cluster 2 = 4, cluster 3 = 2).
+
+### Análisis cluster NO jerárquico
+
+#### Hopkins statistics
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# Escalar valores
+# revistas_panama_dep |> str()
+df_scaled_revistas <- scale(revistas_panama_dep[,c(33:37)], center = TRUE, scale = TRUE)
+
+# Hopkins statistics
+set.seed(123)
+hopkins(df_scaled_revistas, n = nrow(df_scaled_revistas) - 1)
+
+
+```
+
+El valor del estadistico de hopkins es 0.1763058, un valor cercano a 0 por lo que los datos tienen tendencia a formar clusters. Los resultados muestran evidencias de que las observaciones del set de datos *df_scaled_revistas* no siguen una distribución espacial uniforme, por lo que su estructura contiene algún tipo de agrupación.
+
+#### Cálculo del número optimo de cluster
+
+**- Elbow method** <br>
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# Elbow method
+fviz_nbclust(x = df_scaled_revistas, 
+             FUNcluster = kmeans, 
+             method = "wss", 
+             k.max = 15) +
+  labs(title = "Número óptimo de clusters")
+
+
+```
+
+**- Average silhouette method** <br>
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+fviz_nbclust(x = df_scaled_revistas, 
+             FUNcluster = kmeans, 
+             method = "silhouette", 
+             k.max = 15) +
+  labs(title = "Número óptimo de clusters")
+
+```
+
+**- Gap statistic method** <br>
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+set.seed(123)
+fviz_nbclust(x = df_scaled_revistas, 
+             FUNcluster = kmeans, 
+             method = "gap_stat", 
+             nboot = 500,
+             k.max = 15, 
+             verbose = FALSE, 
+             nstart = 50) +
+  labs(title = "Número óptimo de clusters")
+
+```
+
+De las pruebas utilizadas para el número óptimo de clsuter, la de *Gap statistic method* y *Elbow method* indican que el número de cluster óptimo a selecionar es de 3.
+
+#### El método de K-means clustering
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+set.seed(123)
+km_clusters <- kmeans(x = df_scaled_revistas, centers = 3, nstart = 50)
+# km_clusters_p <- pam(x = df_scaled_revistas, k = 3, metric = "manhattan") # utilizando K-medoids(pam)
+table(km_clusters$cluster)
+
+```
+
+Utilizando los datos cuantitatvos de revistas escalados, se hizo el análisis de agrupación utilizando *kmeans* y 3 clusters, dando como resultado, cluster 1 =35, cluster 2 = 17, y cluster 3 = 6.
+
+#### Calidad de los clusters - silhouette
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+sil <- silhouette(km_clusters$cluster, dist(df_scaled_revistas))
+fviz_silhouette(sil,
+                gtheme = theme_classic()) 
+
+```
+
+#### Calidad de los clusters
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+```
+
+El gráfico de silhoutte muestra los tres cluster generados con un promedio de 0.56, que indica una calidad moderada en la formación de los clústeres, siendo el cluster con mayor candidad de observación el cluster 1.
+
+#### Gráfico de cluster no jerarquico kmeans
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+fviz_cluster(km_clusters, 
+             df_scaled_revistas, 
+             ellipse.type = "convex", 
+             palette = "rainbow_hcl")
+
+revistas_panama_dep_ <- revistas_panama_dep
+# name_revistas <- revistas_panama_dep$revista
+revistas_panama_dep_$cluster_ <- km_clusters$cluster
+# revistas_panama_dep_$name <-name_revistas
+
+# colnames(revistas_panama_dep_) |> data.frame()
+#mostrar revistas agrupadas del cluster 3 
+revistas_panama_dep_[,c(1,39)] |> 
+  filter(cluster_ == 3) 
+
+```
+
+El gráfico muestra las revistas agrupadas por clusters en este método, donde el cluster 3 contiene las revistas que con caracteristicas similares se agruparon en los clusters más pequeños en en las pruebas de métodos no jerarquicos.
+
+## OBJETIVO 3. Identificar dimensiones clave mediante el Análisis de Correspondencia Múltiple (MCA) que expliquen las similitudes y diferencias entre las revistas, facilitando su clasificación y evaluación.
+
+### Análisis de correspondencias múltiple (ACM)
+
+Para la prueba de análisis de correspondencia múltiple, se utilizaron los datos categorias de las bases de datos de revistas, adicional los datos de el valor de cada cluster generado por *Kmeans*. Se utilizó la función *Investigate* de paquete *FactoInvestigate*. En las pruebas iniciales, el informe no puedo hacer el análisis de todas las variables debido a que algunas variables categoricas solo tenian un nivel y en otras la diferencia sustancial entre los valores de cada nivel de los datos, no permitia su análisis, por lo tanto estas variables fueron eliminadas (periodica,crossref,open_aire). El resultado del gráfico de cluster mostró cinco clusters generados, resultado diferentes a las pruebas de los métodos jerárquicos y no jerárquicos. <br> Se transformaron los datos cuantitativos en datos categoricos de tres niveles y se incluyeron en los datos a evaluar. En el cálculo de la distancia se utilizó nuevamnete la métrica de *gower* en la función *daisy()* incluyendo todas las variables que utilizó la función *Investigate*.
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# eliminar variables que no se usaran en el MCA (4 es el tema)
+revistas_panama_cluster <- revistas_panama_dep[,-c(1,4,8)] 
+revistas_panama_cluster$cluster_ <- km_clusters$cluster |> as.factor()
+# colnames(revistas_panama_cluster)|> data.frame()
+
+ # transformar datos numericos a categoricos
+# Calcular los cuantiles (terciles)
+terciles <- quantile(revistas_panama_cluster$citas, probs = c(0, 1/3, 2/3, 1))
+revistas_panama_cluster$citas <- cut(revistas_panama_cluster$citas, 
+                                     breaks = terciles, 
+                                     labels = c("bajo", "medio", "alto"), 
+                                     include.lowest = TRUE) # Incluir el valor mínimo en el primer rango
+
+terciles <- quantile(revistas_panama_cluster$publicaciones, probs = c(0, 1/3, 2/3, 1))
+revistas_panama_cluster$publicaciones <- cut(revistas_panama_cluster$publicaciones,
+                                             breaks = terciles, 
+                                             labels = c("bajo", "medio", "alto"), 
+                                             include.lowest = TRUE) # Incluir el valor mínimo en el primer rango
+
+terciles <- quantile(revistas_panama_cluster$h_index, probs = c(0, 1/3, 2/3, 1))
+revistas_panama_cluster$h_index <- cut(revistas_panama_cluster$h_index,
+                                       breaks = terciles, 
+                                       labels = c("bajo", "medio", "alto"), 
+                                       include.lowest = TRUE) # Incluir el valor mínimo en el primer rango
+
+terciles <- quantile(revistas_panama_cluster$citas_anio, probs = c(0, 1/3, 2/3, 1))
+revistas_panama_cluster$citas_anio <- cut(revistas_panama_cluster$citas_anio,
+                                          breaks = terciles, 
+                                          labels = c("bajo", "medio", "alto"), 
+                                          include.lowest = TRUE) # Incluir el valor mínimo en el primer rango
+
+terciles <- quantile(revistas_panama_cluster$citas_publica, probs = c(0, 1/3, 2/3, 1))
+revistas_panama_cluster$citas_publica <- cut(revistas_panama_cluster$citas_publica,
+                                             breaks = terciles, 
+                                             labels = c("bajo", "medio", "alto"), 
+                                             include.lowest = TRUE) # Incluir el valor mínimo en el primer rango
+
+```
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# calculo de MCA
+res_ <- MCA(revistas_panama_cluster[,c(3:18,20,21,23,24,25,27:31)], graph = FALSE)
+
+str(revistas_panama_cluster[,c(3:18,20,21,23,24,25,27:31)])
+# Investigate(res_)
+
+set.seed(123)
+dist_gower_d_ <- daisy(revistas_panama_cluster[,c(3:18,20,21,23,24,25,27:31)],metric = "gower") 
+clust_d_ <- hclust(dist_gower_d_, method = "complete") 
+cluster_daisy_ <- cutree(clust_d_, k=3) |> as.factor()
+cluster_daisy_ |>  table()
+
+```
+
+### Distribucion de la Inercia
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+res <- res_
+fviz_screeplot(res, addlabels = TRUE)
+
+```
+
+Una estimación del número adecuado de ejes para interpretar sugiere restringir el análisis a la descripción de los primeros tres ejes. Estos ejes presentan una cantidad de inercia mayor que la obtenida por el cuantil 0.95 de las distribuciones aleatorias (49.23% frente a 26.42%). Esta observación sugiere que solo estos ejes contienen información real. Como consecuencia, la descripción se limitará a estos ejes.
+
+### Description of the plane 1:2 - Individuos y Variables
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+fviz_mca_ind(res, #objeto lista con resultados mca 
+             repel = TRUE, # evitar el traslape de etiquetas
+             axes = c(1,2),
+             ggtheme = theme_minimal(),
+             max.overlaps = "ggrepel.max.overlaps"
+)
+
+# variables
+fviz_mca_var(res, #objeto lista con resultados mca 
+             axes = c(1,2),
+             repel = TRUE, # evitar el traslape de etiquetas
+             ggtheme = theme_minimal(),
+             max.overlaps = "ggrepel.max.overlaps"
+)
+
+```
+
+**Dimensión 1**
+
+La dimensión 1 opone a individuos como 51, 55, 52, 40, 37, 39, 14, 17 y 42 (a la derecha del gráfico, caracterizados por una coordenada fuertemente positiva en el eje) con individuos como 56, 4, 10, 38, 9, 46 y 48 (a la izquierda del gráfico, caracterizados por una coordenada fuertemente negativa en el eje).
+
+**Grupo 1 (individuos 40, 37, 39, 14, 17 y 42; coordenada positiva en el eje):**
+
+-   **Alta frecuencia:** panindex=panindex_si, catalogo_Latindex=catalogo_Latindex_si, repositorio=repositorio_si, base=base_si, estadisticas=estadisticas_si, amelica=amelica_si, latindex=latindex_si, orcid=orcid_si, soft_plagio=soft_plagio_si y doi=doi_si (factores ordenados de más a menos comunes).
+-   **Baja frecuencia:** catalogo_Latindex=catalogo_Latindex_no, panindex=panindex_no, estadisticas=estadisticas_no, base=base_no, repositorio=repositorio_no, h_index=h_index_bajo, amelica=amelica_no, orcid=orcid_no, latindex=latindex_no y soft_plagio=soft_plagio_no (factores ordenados de más a menos raros).
+
+**Grupo 2 (individuos 51, 55 y 52; coordenada positiva en el eje):**
+
+-   **Alta frecuencia:** google_scholar=google_scholar_si, core=core_si, sherpa=sherpa_si, erihplus=erihplus_si, doaj=doaj_si, miar=miar_si, h_index=h_index_alto, publicaciones=publicaciones_alto y scilit=scilit_si (factores ordenados de más a menos comunes).
+-   **Baja frecuencia:** sherpa=sherpa_no, core=core_no, google_scholar=google_scholar_no, doaj=doaj_no, erihplus=erihplus_no, miar=miar_no y scilit=scilit_no (factores ordenados de más a menos raros).
+
+**Grupo 3 (individuos 56, 4, 10, 38, 9, 46 y 48; coordenada negativa en el eje):**
+
+-   **Alta frecuencia**: panindex=panindex_no, catalogo_Latindex=catalogo_Latindex_no, h_index=h_index_bajo, repositorio=repositorio_no, base=base_no, estadisticas=estadisticas_no, amelica=amelica_no, latindex=latindex_no, orcid=orcid_no y scilit=scilit_no (factores ordenados de más a menos comunes).
+-   **Baja frecuencia:** catalogo_Latindex=catalogo_Latindex_si, panindex=panindex_si, estadisticas=estadisticas_si, base=base_si, repositorio=repositorio_si, amelica=amelica_si, orcid=orcid_si, latindex=latindex_si, scilit=scilit_si y publicaciones=publicaciones_alto (factores ordenados de más a menos raros).
+
+**Dimensión 2** La dimensión 2 opone a individuos como 51, 55, 52, 56, 4, 10, 38, 9, 46 y 48 (parte superior del gráfico, caracterizados por una coordenada fuertemente positiva en el eje) con individuos como 40, 37, 39, 14, 17 y 42 (parte inferior del gráfico, caracterizados por una coordenada fuertemente negativa en el eje).
+
+**Grupo 1 (individuos 56, 4, 10, 38, 9, 46 y 48; coordenada positiva en el eje):**
+
+-   **Alta frecuencia:** panindex=panindex_no, catalogo_Latindex=catalogo_Latindex_no, h_index=h_index_bajo, repositorio=repositorio_no, base=base_no, estadisticas=estadisticas_no, amelica=amelica_no, latindex=latindex_no, orcid=orcid_no y scilit=scilit_no (factores ordenados de más a menos comunes).
+-   **Baja frecuencia:** catalogo_Latindex=catalogo_Latindex_si, panindex=panindex_si, estadisticas=estadisticas_si, base=base_si, repositorio=repositorio_si, amelica=amelica_si, orcid=orcid_si, latindex=latindex_si, scilit=scilit_si y publicaciones=publicaciones_alto (factores ordenados de más a menos raros).
+
+**Grupo 2 (individuos 51, 55 y 52; coordenada positiva en el eje):**
+
+-   **Alta frecuencia:** google_scholar=google_scholar_si, core=core_si, sherpa=sherpa_si, erihplus=erihplus_si, doaj=doaj_si, miar=miar_si, h_index=h_index_alto, publicaciones=publicaciones_alto y scilit=scilit_si (factores ordenados de más a menos comunes).
+-   **Baja frecuencia**: sherpa=sherpa_no, core=core_no, google_scholar=google_scholar_no, doaj=doaj_no, erihplus=erihplus_no, miar=miar_no y scilit=scilit_no (factores ordenados de más a menos raros).
+
+**Grupo 3 (individuos 40, 37, 39, 14, 17 y 42; coordenada negativa en el eje):**
+
+-   **Alta frecuencia:** panindex=panindex_si, catalogo_Latindex=catalogo_Latindex_si, repositorio=repositorio_si, base=base_si, estadisticas=estadisticas_si, amelica=amelica_si, latindex=latindex_si, orcid=orcid_si, soft_plagio=soft_plagio_si y doi=doi_si (factores ordenados de más a menos comunes).
+-   **Baja frecuencia:** catalogo_Latindex=catalogo_Latindex_no, panindex=panindex_no, estadisticas=estadisticas_no, base=base_no, repositorio=repositorio_no, h_index=h_index_bajo, amelica=amelica_no, orcid=orcid_no, latindex=latindex_no y soft_plagio=soft_plagio_no (factores ordenados de más a menos raros).
+
+### Description of the plane 3-4 - Individuos y Variables
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+
+fviz_mca_ind(res, #objeto lista con resultados mca 
+             axes = c(3,4),
+             repel = TRUE, # evitar el traslape de etiquetas
+             ggtheme = theme_minimal(),
+             max.overlaps = "ggrepel.max.overlaps"
+)
+
+
+# variables
+fviz_mca_var(res, #objeto lista con resultados mca 
+             axes = c(3,4),
+             repel = TRUE, # evitar el traslape de etiquetas
+             ggtheme = theme_minimal(),
+             max.overlaps = "ggrepel.max.overlaps"
+)
+
+```
+
+La dimensión 3 opone a los individuos como 6, 16 y 7 (a la derecha del gráfico, caracterizados por una coordenada fuertemente positiva en el eje) a los individuos como 31, 18, 26, 23, 27, 41 y 36 (a la izquierda del gráfico, caracterizados por una coordenada fuertemente negativa en el eje).
+
+El grupo en el que se encuentran los individuos 6, 16 y 7 (caracterizados por una coordenada positiva en el eje) comparte:
+
+-   *Alta frecuencia para los factores:* lilacs=lilacs_si, doi=doi_si, h_index=h_index_alto y publicaciones=publicaciones_alto (factores ordenados de más a menos comunes).
+
+-   *Baja frecuencia para los factores:* lilacs=lilacs_no y doi=doi_no (factores ordenados de menos a más comunes). El grupo en el que se encuentran los individuos 31, 18, 26, 23, 27, 41 y 36 (caracterizados por una coordenada negativa en el eje) comparte:
+
+-   *Alta frecuencia para los factores:* publicaciones=publicaciones_bajo, latindex=latindex_no, catalogo_Latindex=catalogo_Latindex_no, panindex=panindex_no, soft_plagio=soft_plagio_si, orcid=orcid_si, latin_rev=latin_rev_no y repositorio=repositorio_si (factores ordenados de más a menos comunes).
+
+-   *Baja frecuencia para los factores:* latindex=latindex_si, publicaciones=publicaciones_medio, catalogo_Latindex=catalogo_Latindex_si, panindex=panindex_si, orcid=orcid_no, soft_plagio=soft_plagio_no, latin_rev=latin_rev_si y repositorio=repositorio_no (factores ordenados de menos a más comunes).
+
+### Classification Jerarquica de los Individuos
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+fviz_mca_ind(res, #objeto lista con resultados mca 
+             repel = TRUE, # evitar el traslape de etiquetas
+             ggtheme = theme_minimal(),
+             # geom = "point", 
+             max.overlaps = "ggrepel.max.overlaps",
+             # habillage = revistas_panama_cluster$cluster_ 
+             habillage = cluster_daisy_
+             # col.ind = revistas_panama_cluster$cluster_ 
+)
+
+```
+
+La clasificación realizada sobre los individuos revela 3 clústeres:
+
+*Clúster 1:* Compuesto por los individuos 4, 6, 7, 9, 10, 38, 45, 46, 48 y 56. Este grupo se caracteriza por:
+
+-   *Alta frecuencia de factores como:* catalogo_Latindex=catalogo_Latindex_no, panindex=panindex_no, h_index=h_index_bajo, latindex=latindex_no, estadisticas=estadisticas_no, amelica=amelica_no, publicaciones=publicaciones_bajo, repositorio=repositorio_no, scilit=scilit_no y base=base_no (factores ordenados de más a menos comunes).
+-   *Baja frecuencia de factores como:* catalogo_Latindex=catalogo_Latindex_si, panindex=panindex_si, latindex=latindex_si, estadisticas=estadisticas_si, amelica=amelica_si, repositorio=repositorio_si, publicaciones=publicaciones_alto, scilit=scilit_si, base=base_si y soft_plagio=soft_plagio_si (factores ordenados de menos a más comunes).
+
+*Clúster 2:* Compuesto por los individuos 14, 17, 20, 37, 39, 40 y 42. Este grupo se caracteriza por:
+
+-   *Alta frecuencia de factores como:* panindex=panindex_si, catalogo_Latindex=catalogo_Latindex_si, latindex=latindex_si, estadisticas=estadisticas_si, h_index=h_index_medio, amelica=amelica_si, repositorio=repositorio_si, base=base_si, soft_plagio=soft_plagio_si y publicaciones=publicaciones_alto (factores ordenados de más a menos comunes).
+-   *Baja frecuencia de factores como:* panindex=panindex_no, catalogo_Latindex=catalogo_Latindex_no, latindex=latindex_no, h_index=h_index_bajo, estadisticas=estadisticas_no, amelica=amelica_no, publicaciones=publicaciones_bajo, repositorio=repositorio_no, base=base_no y soft_plagio=soft_plagio_no (factores ordenados de menos a más comunes).
+
+*Clúster 3:* Compuesto por los individuos 51, 52 y 55. Este grupo se caracteriza por:
+
+-   *Alta frecuencia de factores como:* sherpa=sherpa_si, core=core_si, erihplus=erihplus_si, doaj=doaj_si, google_scholar=google_scholar_si, miar=miar_si, h_index=h_index_alto, scilit=scilit_si, publicaciones=publicaciones_alto y latin_rev=latin_rev_si (factores ordenados de más a menos comunes).
+-   *Baja frecuencia de factores como:* sherpa=sherpa_no, core=core_no, doaj=doaj_no, erihplus=erihplus_no, google_scholar=google_scholar_no, miar=miar_no, scilit=scilit_no, latin_rev=latin_rev_no y amelica=amelica_no (factores ordenados de menos a más comunes).
+
+### Biplot Individuos y variables
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+fviz_mca_biplot(res, 
+                axes = c(1, 2),
+                select.var = list(contrib = 15),
+                select.ind = list(contrib = 30),
+                repel = TRUE, # evitar la superposición de etiquetas en la gráfica
+                alpha.ind = 0.1, # nivel de transparencia de los puntos filas o casos
+                alpha.var = 0.5, # nivel de transparencia de los puntos columa o variables
+                max.overlaps = "ggrepel.max.overlaps",
+                col.var="steelblue",
+                col.ind = cluster_daisy_ ,
+                stat = "identity", position = "identity",
+              
+                # addEllipses = TRUE,
+                ggtheme = theme_minimal()) 
+
+```
+
+### Contributions of rows to dimension 1 al 4
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+
+fviz_contrib(res, choice = "var", axes = 1:2, top = 25)
+fviz_contrib(res, choice = "var", axes = 1:3, top = 25)
+fviz_contrib(res, choice = "var", axes = 2:3, top = 25)
+fviz_contrib(res, choice = "var", axes = 3:4, top = 25)
+
+```
+
+## OBJETIVO 4. Evaluar la relación entre los diferentes indicadores cualitativos y cuantitativos para mejorar la visibilidad y el impacto de las publicaciones en las revistas científicas nacionales.
+
+### Pruebas de normalidad
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# Prueba de normalidad
+test <- mapply(shapiro.test,revistas_panama_dep[,c(33:37)]) |> data.frame() |> t()
+no_normal <- test[,2] < 0.05 
+test <- cbind(test, no_normal)
+test <- test[,c(1,2,5)] 
+# knitr::kable(test)
+test
+
+
+
+```
+
+Al realizar una prueba de normalidad de los datos utilizando **shapiro.test**, todas la variables muestra un p_value  < 0.05, por lo que ninguna de las variables sigue una distribución normal. 
+
+### Cálculo de correlación
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+matrix <- cor(revistas_panama_dep[,c(33:37)], method="kendall") # datos pequeños
+matrix
+
+
+
+```
+
+Utilizando las pruebas no parámetrica **kendall**, el resultado de la matrix indica un fuerte correlación entre variables y todas positivas. Las publicaciones estan moderadamente correlacionada con h_index (0.71) y citas (0.973), a medida que el número de publicaciones aumenta, es probable que aumenten tanto el índice h como el número de citas. Sin embargo, hay una correlación baja con citas_publica (0.55) y citas_anio (0.60),lo que sugiere tener que generar un mayor número de publicaciones para generar mas citas por año.
+
+El hindex, tiene una alta correlación con citas (0.81) y citas_publica (0.81) y moderada con citas_anio (0.74). Esto inidca que las revistas con alto Hindex, tienden a tener mas citas totales , citas por año, citas por publicación. Las citas están fuertemente correlacionada con citas_publica (0.85) y citas_anio (0.75.
+
+### Tablas de contingencia y visualización
+
+#### Revistas con año y tipo institucion
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+revistas_panama_cluster$tema <- revistas_panama_dep$tema
+# revistas_panama_dep |> str()
+
+# Revistas con año y tipo institucion
+revistas_panama_dep |> 
+  ggplot(aes(ano_de_inicio, fill=tipo_institucion)) +
+  geom_bar() +
+  geom_text(
+    aes(label = after_stat(count)
+    ),
+    stat = "count",
+    position = position_stack(0.5, 0.0)
+  )
+
+
+
+```
+
+El gráfico muestra un aumento constante en el número de revistas científicas a lo largo de los años, especialmente en las últimas décadas, lo que puede indicar un crecimiento en la producción académica. Las universidades son las principales generadoras de revistas científicas en los periodos analizados, siendo la década de 2001-2020 la que presenta el inicio de un crecimiento exponencial.  
+
+
+#### Revistas tipo_institucion - catálogo Latindex
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+revistas_panama_dep |> 
+  ggplot(aes(tipo_institucion, fill=catalogo_Latindex)) +
+  geom_bar() +
+  geom_text(
+    aes(label = after_stat(count)
+    ),
+    stat = "count",
+    position = position_stack(0.5, 0.0)
+  )
+
+
+```
+
+El gráfico muestra una comparación entre las revistas científicas de Panamá, clasificadas por el tipo de institución que las publica (universidades u otras entidades) y si están o no indexadas en el catálogo Latindex. El catálogo de Latindex es una plataforma que evalua la calidad de las revistas basado en 38 criterios, por lo que la indexación de las revistas implica una buena gestión editorial. El gráfico muestra un porcentaje significativo de las revistas, especialmente las publicadas por universidades, están indexadas en esta plataforma, esto indica un alto nivel de calidad y visibilidad a nivel regional para estas publicaciones. 
+
+#### Revistas con DOI que estan en Crossreff
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+revistas_panama_dep |> 
+  ggplot(aes(doi, fill=crossref)) +
+  geom_bar() +
+  geom_text(
+    aes(label = after_stat(count)
+    ),
+    stat = "count",
+    position = position_stack(0.5, 0.0)
+  )
+
+```
+Crosssref es una plataforma que genera identificadores persistentes de documentos (DOI), además de integrar los metadatos de las publicaciones en su bases de datos. El gráfico muestra una comparación entre las revistas científicas, clasificadas según tengan o no un DOI (Digital Object Identifier) y si están o no indexadas en Crossre, donde en su mayoria no poseen DOI, pero tambien hay revistas que poseen DOI pero no est´n en esta plataforma, probablemente porque hayan generado el DOI con la plataforma DataCite. 
+
+
+#### Revistas con PDF_HTML en Google Scholar
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+revistas_panama_dep |> 
+  ggplot(aes(google_scholar, fill=PDF_HTML)) +
+  geom_bar() +
+  geom_text(
+    aes(label = after_stat(count)
+    ),
+    stat = "count",
+    position = position_stack(0.5, 0.0)
+  )
+
+```
+Google Scholar dentro de sus recursos ofrece la opción de generar un perfil en Google Scholar Citations, además de ser un buscador especializado, por lo que estar integrado en esta plataforma es debe ser de interés paar editores de revistas. El gráfico muestra una comparación entre las revistas científicas, clasificadas según estén o no indexadas en Google Scholar y si ofrecen sus artículos en formato PDF y HTML (todas las revistas del estudio estaban en formato PDF e integradas a Google Scholar como base de datos), donde un porcentaje menor de revistas ofrece sus artículos en formato HTML.
+
+#### Prueba de correlación
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+cor.test(revistas_panama_dep$citas, revistas_panama_dep$publicaciones, method = "kendall")
+
+```
+
+tau = 0.7348643 correlacion fuerte positiva entre variables citas y publicaciones. Esto sugiere que las revistas con más publicaciones tienden a recibir más citas. p-value = 1.56e-15 \< 0.05, existe una correlación significativa entre las variables.
+
+**Análisis variables citas y hindex**
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# variables citas  y hindex
+cor.test(revistas_panama_dep$citas, revistas_panama_dep$h_index, method = "kendall")
+
+```
+
+El tau = 0.8780412 indica una correlación positiva muy fuerte entre variables citas y hindex. Esto sugiere que las revistas las revistas con más citas tienden a tener hindex más alto. p-value = 2.2e-16\< 0.05, existe una correlación significativa entre las variables.
+
+**Análisis variables publicaciones y hindex**
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# variables publicaciones  y hindex
+cor.test(revistas_panama_dep$publicaciones, revistas_panama_dep$h_index, method = "kendall")
+
+```
+
+El tau = 0.7169417 muestra,  correlacion positiva fuerte entre variables publicaciones y hindex. Esto sugiere medida que el número de publicaciones de una revista aumenta, también tiende a aumentar su hindex. p-value = 8.512e-14\< 0.05, existe una correlación significativa entre las variables.
+
+**Análisis variables citas y citas_anio**
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# variables citas  y citas_anio
+cor.test(revistas_panama_dep$citas, revistas_panama_dep$citas_anio, method = "kendall")
+
+```
+
+El tau = 0.7582957 correlación positiva fuerte entre las variables citas y anual de citas más alto. #p-value = 4.562e-16\< 0.05, existe una correlación significativa entre las variables.
+
+#### Asociacion entre variables categoricas
+
+**Variables institucion y tema**
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# institucion y tema
+tabla_ <- table(revistas_panama_dep$tipo_institucion, revistas_panama_dep$tema)
+chi_test <- chisq.test(tabla_)
+chi_test
+
+```
+
+<!-- p-value = 0.2627, las variables en la tabla de contingencia son independientes (no hay asociación). -->
+
+**Variable doi y catalogo latindex**
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# doi y catalogo latindex
+tabla_ <- table(revistas_panama_dep$doi, revistas_panama_dep$catalogo_Latindex)
+chi_test <- chisq.test(tabla_)
+chi_test
+
+```
+
+<!-- p-value = 0.03465, las variables en la tabla de contingencia son independientes (no hay asociación). -->
+
+**Variable politicas OA y doaj**
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# politicas  y doaj
+tabla_ <- table(revistas_panama_dep$politicas_oa, revistas_panama_dep$doaj)
+chi_test <- chisq.test(tabla_)
+chi_test
+
+```
+
+<!-- p-value = 2.925e-10 existe una asociación significativa entre las variables -->
+
+**Variables formato y google scholar**
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# formato y google scholar
+tabla_ <- table(revistas_panama_dep$google_scholar, revistas_panama_dep$PDF_HTML)
+chi_test <- chisq.test(tabla_)
+chi_test
+```
+
+<!-- p-value = 0.1341, las variables en la tabla de contingencia son independientes (no hay asociación). -->
+
+**Variables pdf_html y DOI**
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# pdf_html y DOI
+tabla_ <- table(revistas_panama_cluster$PDF_HTML, revistas_panama_cluster$doi)
+chi_test <- chisq.test(tabla_)
+chi_test
+
+
+```
+
+<!-- p-value = 0.004981 existe una asociación significativa entre las variables -->
+
+
+En las pruebas de correlación del grupo de variables, **institución y tema**, **DOI y Catálogo Latindex**, y **formato y google scholar**, muestran valores de p-value > 0.05 por lo que no existe una relación significa entre el grupo de variables. 
+
+En las pruebas de correlación de **Políticas de Acceso Abierto y Directorio DOAJ**, el valor p es muy bajo (2.925e-10), muy por debajo del valor de significancia de 0.05. Esto significa que existe una relación estadísticamente significativa entre las políticas de acceso abierto y la inclusión en el directorio DOAJ. Por lo tanto, las revistas con políticas de acceso abierto tienen una probabilidad significativamente mayor de estar en el directorio DOAJ, o viceversa.
+
+#### Prueba t (Prueba de Student)
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+t_test <- t.test(revistas_panama_dep$citas ~ revistas_panama_dep$tipo_institucion)
+t_test
+
+```
+
+El valor t=0.42685 indica **No hay evidencia estadísticamente significativa** para afirmar que las citas promedio difieran entre los grupos otras y Universidad, siendo p-value = 0.69 > 0.05, la media de los grupos no son significativamente diferentes. La media, otras = 136.20000 media, Universidad = 82.28302
+
+
+
+#### Prueba ANOVA (Análisis de Varianza)
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+anova_model <- aov(revistas_panama_dep$citas ~ revistas_panama_dep$tema)
+# kruskal_test <-kruskal.test(revistas_panama_dep$citas ~ revistas_panama_dep$tema)
+# kruskal_test
+summary(anova_model)
+
+```
+
+Los resultados indican 7 grados de libertad (esto corresponde a los 8 temas en total - 1 de la media global).Pr(>F) = 0.225, es mucho mayor que el umbral de 0.05, no hay evidencia suficiente para rechazar la hipótesis nula, que establece que no hay diferencias significativas entre las medias de citas para los diferentes temas, quiere decir que las citas no varían significativamente entre los temas.
+
+# Conclusiones
+
+# Discusión
+
+# Referencias Bibliográficas
+
+# Anexos
+## Resumen de Tabla
+
+```{r warning=FALSE, echo=FALSE, message=FALSE}
+
+# summary(revistas_panama_dep) |>  as.table()
+# revistas_panama_dep |> str()
+skim(revistas_panama_dep)
+# glimpse(revistas_panama_dep)
+
+
+```
+
